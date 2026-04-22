@@ -1,7 +1,10 @@
+# syntax=docker/dockerfile:1.7
+
 FROM ubuntu:24.04 AS chip-tool-builder
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG CONNECTEDHOMEIP_REF=v1.5.0.1
+ARG CHIP_TOOL_BUILD_RETRIES=3
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -34,7 +37,27 @@ RUN git clone --depth 1 --branch "${CONNECTEDHOMEIP_REF}" --recurse-submodules -
 
 WORKDIR /opt/connectedhomeip
 
-RUN bash -lc 'set -eo pipefail; bash ./scripts/bootstrap.sh; source scripts/activate.sh; bash ./scripts/examples/gn_build_example.sh examples/chip-tool out/chip-tool'
+RUN --mount=type=cache,target=/root/.cipd-cache-dir \
+    --mount=type=cache,target=/opt/connectedhomeip/.environment \
+    --mount=type=cache,target=/opt/connectedhomeip/out \
+    bash -lc 'set -euo pipefail; \
+    export CIPD_CACHE_DIR=/root/.cipd-cache-dir; \
+    attempt=1; \
+    until [ "$attempt" -gt "${CHIP_TOOL_BUILD_RETRIES}" ]; do \
+      echo "Building chip-tool (attempt ${attempt}/${CHIP_TOOL_BUILD_RETRIES})"; \
+      if bash ./scripts/bootstrap.sh && \
+         source scripts/activate.sh && \
+         bash ./scripts/examples/gn_build_example.sh examples/chip-tool out/chip-tool; then \
+        exit 0; \
+      fi; \
+      if [ "$attempt" -eq "${CHIP_TOOL_BUILD_RETRIES}" ]; then \
+        echo "chip-tool build failed after ${CHIP_TOOL_BUILD_RETRIES} attempts" >&2; \
+        exit 1; \
+      fi; \
+      attempt=$((attempt + 1)); \
+      echo "Retrying chip-tool bootstrap/build after transient failure..." >&2; \
+      sleep 15; \
+    done'
 
 
 FROM python:3.12-slim
