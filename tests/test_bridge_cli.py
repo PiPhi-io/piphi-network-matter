@@ -339,9 +339,10 @@ def test_bridge_cli_chip_tool_subscribe_state_streams_json_lines(tmp_path) -> No
     )
 
     assert result.exit_code == 0
-    first_line = json.loads(result.output.splitlines()[0])
-    assert first_line["switch_on"] is True
-    assert first_line["connected"] is True
+    payloads = [json.loads(line) for line in result.output.splitlines() if line.strip()]
+    assert payloads
+    assert any(payload.get("switch_on") is True for payload in payloads)
+    assert all(payload["connected"] is True for payload in payloads)
 
 
 def test_bridge_cli_registry_mutations(tmp_path) -> None:
