@@ -1,0 +1,10 @@
+.git
+.pytest_cache
+.venv
+.pdm-build
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+tests
+matter-state

@@ -1,0 +1,43 @@
+{
+  "manifest_version": "1.0",
+  "kind": "platform_service",
+  "id": "piphi.service.matter-sidecar",
+  "name": "Matter Sidecar",
+  "version": "0.1.0",
+  "platforms": ["linux"],
+  "runtime": {
+    "linux": {
+      "type": "container",
+      "container": {
+        "image": "piphinetwork/matter-sidecar",
+        "ports": [
+          { "container": 8710, "host": 8710 }
+        ],
+        "network_mode": "host",
+        "privileged": true,
+        "devices": [
+          { "host": "/dev/bus/usb", "container": "/dev/bus/usb", "permissions": "rwm" }
+        ],
+        "environment": {
+          "MATTER_STORAGE_DIR": "/var/lib/piphi/matter",
+          "MATTER_API_HOST": "0.0.0.0",
+          "MATTER_API_PORT": "8710"
+        }
+      }
+    }
+  },
+  "api": {
+    "endpoints": {
+      "health": "/health",
+      "snapshot": "/v1/snapshot",
+      "entities": "/entities",
+      "discover": "/v1/devices/discover",
+      "commissionables": "/v1/discovery/commissionables",
+      "registry": "/v1/registry",
+      "commission_code": "/v1/commission/code",
+      "configs": "/v1/configs",
+      "telemetry_poll": "/v1/telemetry/poll",
+      "command_invoke": "/v1/commands/invoke"
+    }
+  }
+}
