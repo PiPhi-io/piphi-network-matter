@@ -6,6 +6,8 @@ ARG DEBIAN_FRONTEND=noninteractive
 ARG CONNECTEDHOMEIP_REF=v1.5.0.1
 ARG CHIP_TOOL_BUILD_RETRIES=3
 
+SHELL ["/bin/bash", "-lc"]
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
@@ -40,24 +42,25 @@ WORKDIR /opt/connectedhomeip
 RUN --mount=type=cache,target=/root/.cipd-cache-dir \
     --mount=type=cache,target=/opt/connectedhomeip/.environment \
     --mount=type=cache,target=/opt/connectedhomeip/out \
-    bash -lc 'set -euo pipefail; \
+    set -euo pipefail; \
     export CIPD_CACHE_DIR=/root/.cipd-cache-dir; \
-    attempt=1; \
-    until [ "$attempt" -gt "${CHIP_TOOL_BUILD_RETRIES}" ]; do \
+    for attempt in $(seq 1 "${CHIP_TOOL_BUILD_RETRIES}"); do \
       echo "Building chip-tool (attempt ${attempt}/${CHIP_TOOL_BUILD_RETRIES})"; \
-      if bash ./scripts/bootstrap.sh && \
-         source scripts/activate.sh && \
-         bash ./scripts/examples/gn_build_example.sh examples/chip-tool out/chip-tool; then \
+      if { \
+        bash ./scripts/bootstrap.sh && \
+        . ./scripts/activate.sh && \
+        bash ./scripts/examples/gn_build_example.sh examples/chip-tool out/chip-tool; \
+      }; then \
         exit 0; \
       fi; \
-      if [ "$attempt" -eq "${CHIP_TOOL_BUILD_RETRIES}" ]; then \
+      status=$?; \
+      if [[ "${attempt}" == "${CHIP_TOOL_BUILD_RETRIES}" ]]; then \
         echo "chip-tool build failed after ${CHIP_TOOL_BUILD_RETRIES} attempts" >&2; \
-        exit 1; \
+        exit "${status}"; \
       fi; \
-      attempt=$((attempt + 1)); \
-      echo "Retrying chip-tool bootstrap/build after transient failure..." >&2; \
+      echo "chip-tool build attempt ${attempt} failed with exit code ${status}; retrying..." >&2; \
       sleep 15; \
-    done'
+    done
 
 
 FROM python:3.12-slim
