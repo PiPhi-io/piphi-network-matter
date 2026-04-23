@@ -7,6 +7,7 @@ ARG CONNECTEDHOMEIP_REF=v1.5.0.1
 ARG CHIP_TOOL_BUILD_RETRIES=3
 
 SHELL ["/bin/bash", "-lc"]
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -42,7 +43,7 @@ WORKDIR /opt/connectedhomeip
 RUN --mount=type=cache,target=/root/.cipd-cache-dir \
     --mount=type=cache,target=/opt/connectedhomeip/.environment \
     --mount=type=cache,target=/opt/connectedhomeip/out \
-    set -euo pipefail; \
+    set -eo pipefail; \
     export CIPD_CACHE_DIR=/root/.cipd-cache-dir; \
     for attempt in $(seq 1 "${CHIP_TOOL_BUILD_RETRIES}"); do \
       echo "Building chip-tool (attempt ${attempt}/${CHIP_TOOL_BUILD_RETRIES})"; \
