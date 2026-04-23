@@ -1,37 +1,13 @@
 # syntax=docker/dockerfile:1.7
 
-FROM ubuntu:24.04 AS chip-tool-builder
+ARG CONNECTEDHOMEIP_BUILD_IMAGE=ghcr.io/project-chip/chip-build:182
+FROM ${CONNECTEDHOMEIP_BUILD_IMAGE} AS chip-tool-builder
 
-ARG DEBIAN_FRONTEND=noninteractive
 ARG CONNECTEDHOMEIP_REF=v1.5.0.1
 ARG CHIP_TOOL_BUILD_RETRIES=3
 
+USER root
 SHELL ["/bin/bash", "-lc"]
-ENV PIP_BREAK_SYSTEM_PACKAGES=1
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    curl \
-    cmake \
-    default-jre \
-    g++ \
-    gcc \
-    git \
-    libavahi-client-dev \
-    libdbus-1-dev \
-    libevent-dev \
-    libgirepository1.0-dev \
-    libglib2.0-dev \
-    libreadline-dev \
-    libssl-dev \
-    ninja-build \
-    pkg-config \
-    python3 \
-    python3-dev \
-    python3-pip \
-    python3-venv \
-    unzip \
-    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt
 
@@ -41,16 +17,18 @@ RUN git clone --depth 1 --branch "${CONNECTEDHOMEIP_REF}" --recurse-submodules -
 WORKDIR /opt/connectedhomeip
 
 RUN --mount=type=cache,target=/root/.cipd-cache-dir \
+    --mount=type=cache,target=/root/.cache/ccache \
     --mount=type=cache,target=/opt/connectedhomeip/.environment \
     --mount=type=cache,target=/opt/connectedhomeip/out \
     set -eo pipefail; \
     export CIPD_CACHE_DIR=/root/.cipd-cache-dir; \
+    export CCACHE_DIR=/root/.cache/ccache; \
+    export CHIP_PW_COMMAND_LAUNCHER=ccache; \
     for attempt in $(seq 1 "${CHIP_TOOL_BUILD_RETRIES}"); do \
       echo "Building chip-tool (attempt ${attempt}/${CHIP_TOOL_BUILD_RETRIES})"; \
       if { \
         bash ./scripts/bootstrap.sh && \
-        . ./scripts/activate.sh && \
-        bash ./scripts/examples/gn_build_example.sh examples/chip-tool out/chip-tool; \
+        ./scripts/run_in_build_env.sh "./scripts/examples/gn_build_example.sh examples/chip-tool out/chip-tool"; \
       }; then \
         exit 0; \
       fi; \
