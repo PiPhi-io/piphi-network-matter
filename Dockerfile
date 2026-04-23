@@ -1,46 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
-ARG CONNECTEDHOMEIP_BUILD_IMAGE=ghcr.io/project-chip/chip-build:182
-FROM ${CONNECTEDHOMEIP_BUILD_IMAGE} AS chip-tool-builder
-
-ARG CONNECTEDHOMEIP_REF=v1.5.0.1
-ARG CHIP_TOOL_BUILD_RETRIES=3
-
-USER root
-SHELL ["/bin/bash", "-lc"]
-
-WORKDIR /opt
-
-RUN git clone --depth 1 --branch "${CONNECTEDHOMEIP_REF}" --recurse-submodules --shallow-submodules \
-    https://github.com/project-chip/connectedhomeip.git /opt/connectedhomeip
-
-WORKDIR /opt/connectedhomeip
-
-RUN --mount=type=cache,target=/root/.cipd-cache-dir \
-    --mount=type=cache,target=/root/.cache/ccache \
-    --mount=type=cache,target=/opt/connectedhomeip/.environment \
-    --mount=type=cache,target=/opt/connectedhomeip/out \
-    set -eo pipefail; \
-    export CIPD_CACHE_DIR=/root/.cipd-cache-dir; \
-    export CCACHE_DIR=/root/.cache/ccache; \
-    export CHIP_PW_COMMAND_LAUNCHER=ccache; \
-    for attempt in $(seq 1 "${CHIP_TOOL_BUILD_RETRIES}"); do \
-      echo "Building chip-tool (attempt ${attempt}/${CHIP_TOOL_BUILD_RETRIES})"; \
-      if { \
-        bash ./scripts/bootstrap.sh && \
-        ./scripts/run_in_build_env.sh "./scripts/examples/gn_build_example.sh examples/chip-tool out/chip-tool"; \
-      }; then \
-        exit 0; \
-      fi; \
-      status=$?; \
-      if [[ "${attempt}" == "${CHIP_TOOL_BUILD_RETRIES}" ]]; then \
-        echo "chip-tool build failed after ${CHIP_TOOL_BUILD_RETRIES} attempts" >&2; \
-        exit "${status}"; \
-      fi; \
-      echo "chip-tool build attempt ${attempt} failed with exit code ${status}; retrying..." >&2; \
-      sleep 15; \
-    done
-
+ARG CHIP_TOOL_IMAGE=piphinetwork/matter-chip-tool:v1.5.0.1
+FROM ${CHIP_TOOL_IMAGE} AS chip-tool-binary
 
 FROM python:3.12-slim
 
@@ -73,7 +34,7 @@ COPY docker/entrypoint.sh /usr/local/bin/piphi-matter-entrypoint
 
 RUN pip install . && chmod +x /usr/local/bin/piphi-matter-entrypoint
 
-COPY --from=chip-tool-builder /opt/connectedhomeip/out/chip-tool/chip-tool /usr/local/bin/chip-tool
+COPY --from=chip-tool-binary /usr/local/bin/chip-tool /usr/local/bin/chip-tool
 
 EXPOSE 8710
 

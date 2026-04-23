@@ -227,6 +227,31 @@ pdm run matter serve-api \
   --api-port 8710
 ```
 
+## Image release flow
+
+The Docker release path is intentionally split in two:
+
+- `piphinetwork/matter-chip-tool:<CONNECTEDHOMEIP_REF>`
+  A rarely updated artifact image that only contains a prebuilt `chip-tool` binary.
+- `piphinetwork/matter-sidecar:<version>`
+  The normal sidecar image that copies `chip-tool` from the prebuilt artifact image and ships the Python API/runtime.
+
+Recommended release order:
+
+1. Build or refresh the `chip-tool` artifact image with the `Build Matter chip-tool image` workflow when `CONNECTEDHOMEIP_REF` changes.
+2. Release the normal sidecar image with the `Release Matter Sidecar to Docker Hub` workflow, pointing it at the desired prebuilt `chip-tool` image tag.
+
+The `chip-tool` workflow builds the binary in the upstream Matter build environment first, then packages only that binary into the artifact image. This avoids compiling `connectedhomeip` inside the normal sidecar Docker release build.
+
+The repo also keeps the currently recommended prebuilt `chip-tool` artifact pinned in:
+
+- `.github/matter-chip-tool-image.txt`
+
+The `Build Matter chip-tool image` workflow updates that file to a digest-pinned image reference after a successful publish.
+The `Release Matter Sidecar to Docker Hub` workflow defaults `chip_tool_image` to `pinned`, which resolves to that tracked digest.
+
+This keeps normal sidecar releases lightweight and avoids rebuilding the full Matter toolchain on every app release.
+
 ## Sidecar API
 
 The sidecar now exposes a small local FastAPI contract:

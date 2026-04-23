@@ -36,6 +36,11 @@ on:
         description: Explicit semantic version when release_type is custom
         required: false
         type: string
+      chip_tool_image:
+        description: Prebuilt chip-tool image to copy from during the sidecar build. Use 'pinned' for the repo-managed digest.
+        required: true
+        default: pinned
+        type: string
       push_latest:
         description: Also publish the latest tag for stable releases
         required: true
@@ -58,6 +63,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.ref_name }}
 
       - name: Require default branch
         shell: bash
@@ -167,6 +173,28 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Resolve prebuilt chip-tool image
+        id: chip_tool
+        shell: bash
+        run: |
+          set -euo pipefail
+          requested="${{ inputs.chip_tool_image }}"
+          if [[ -z "$requested" || "$requested" == "pinned" ]]; then
+            requested="$(tr -d '\n' < .github/matter-chip-tool-image.txt)"
+          fi
+          if [[ -z "$requested" ]]; then
+            echo "Resolved chip_tool_image is empty." >&2
+            exit 1
+          fi
+          echo "image=$requested" >> "$GITHUB_OUTPUT"
+          echo "Resolved prebuilt chip-tool image: $requested"
+
+      - name: Verify prebuilt chip-tool image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker buildx imagetools inspect "${{ steps.chip_tool.outputs.image }}" >/dev/null
+
       - name: Prepare image metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -188,6 +216,8 @@ jobs:
         with:
           context: .
           push: true
+          build-args: |
+            CHIP_TOOL_IMAGE=${{ steps.chip_tool.outputs.image }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -197,7 +227,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git push origin HEAD
+          git push origin HEAD:${GITHUB_REF_NAME}
           git push origin "v${{ steps.version.outputs.version }}"
 
       - name: Create GitHub release
@@ -215,5 +245,6 @@ jobs:
           if [[ "${{ inputs.push_latest }}" == "true" && "${{ steps.version.outputs.stable }}" == "true" ]]; then
             echo "Published piphinetwork/matter-sidecar:latest" >> "$GITHUB_STEP_SUMMARY"
           fi
+          echo "Using prebuilt chip-tool image: ${{ steps.chip_tool.outputs.image }}" >> "$GITHUB_STEP_SUMMARY"
           echo "Committed pyproject.toml and src/manifest.json at version ${{ steps.version.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
           echo "Release revision: ${{ steps.git.outputs.sha }}" >> "$GITHUB_STEP_SUMMARY"
