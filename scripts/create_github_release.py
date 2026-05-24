@@ -21,7 +21,7 @@ PYPROJECT_VERSION_RE = re.compile(r'(?m)^(version\s*=\s*")([^"]+)(")$')
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Create a GitHub Release for the current Matter sidecar version."
+        description="Create a GitHub Release for the current PiPhi integration/sidecar version."
     )
     parser.add_argument("--title", help="Optional release title. Defaults to v<version>.")
     parser.add_argument("--target", help="Optional commit/branch to tag from.")
@@ -35,6 +35,21 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Fail if the GitHub release tag already exists.",
     )
+    parser.add_argument(
+        "--repo-root",
+        default=None,
+        help="Repository root. Defaults to the parent directory of this script.",
+    )
+    parser.add_argument(
+        "--pyproject",
+        default="pyproject.toml",
+        help="Path to pyproject.toml, relative to repo-root unless absolute.",
+    )
+    parser.add_argument(
+        "--manifest",
+        default="src/manifest.json",
+        help="Path to manifest.json, relative to repo-root unless absolute.",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Print the gh command without executing it.")
     return parser.parse_args()
 
@@ -45,9 +60,22 @@ def ensure_semver(value: str) -> str:
     return value
 
 
-def read_current_version(repo_root: Path) -> str:
-    pyproject_path = repo_root / "pyproject.toml"
-    manifest_path = repo_root / "src" / "manifest.json"
+def resolve_repo_root(value: str | None) -> Path:
+    if value:
+        return Path(value).expanduser().resolve()
+    return Path(__file__).resolve().parents[1]
+
+
+def resolve_path(repo_root: Path, value: str) -> Path:
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = repo_root / path
+    return path.resolve()
+
+
+def read_current_version(repo_root: Path, *, pyproject_rel: str, manifest_rel: str) -> str:
+    pyproject_path = resolve_path(repo_root, pyproject_rel)
+    manifest_path = resolve_path(repo_root, manifest_rel)
 
     pyproject_text = pyproject_path.read_text(encoding="utf-8")
     pyproject_match = PYPROJECT_VERSION_RE.search(pyproject_text)
@@ -71,13 +99,14 @@ def check_gh_installed() -> None:
 
 def main() -> int:
     args = parse_args()
-    repo_root = Path(__file__).resolve().parents[1]
-    version = read_current_version(repo_root)
+    repo_root = resolve_repo_root(args.repo_root)
+    version = read_current_version(repo_root, pyproject_rel=args.pyproject, manifest_rel=args.manifest)
     tag = f"v{version}"
     prerelease = "-" in version
     title = args.title or tag
 
-    check_gh_installed()
+    if not args.dry_run or args.verify_tag_absent:
+        check_gh_installed()
 
     if args.verify_tag_absent:
         result = subprocess.run(

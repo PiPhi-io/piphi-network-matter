@@ -17,7 +17,6 @@ SEMVER_RE = re.compile(
     r"(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$"
 )
 PYPROJECT_VERSION_RE = re.compile(r'(?m)^(version\s*=\s*")([^"]+)(")$')
-DEFAULT_IMAGE = "piphinetwork/matter-sidecar"
 DEFAULT_PREID = "alpha"
 BUMP_CHOICES = (
     "major",
@@ -87,7 +86,10 @@ class SemVer:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Bump the Matter sidecar semver across pyproject.toml and src/manifest.json."
+        description=(
+            "Bump the semantic version for a PiPhi integration/sidecar across "
+            "pyproject.toml and src/manifest.json."
+        )
     )
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--bump", choices=BUMP_CHOICES, help="Increment the current version.")
@@ -98,17 +100,54 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_PREID,
         help="Prerelease identifier used with pre* or prerelease bumps.",
     )
-    parser.add_argument("--docker-image", default=DEFAULT_IMAGE, help="Docker image repository to pin in the manifest.")
+    parser.add_argument(
+        "--repo-root",
+        default=None,
+        help="Repository root. Defaults to the parent directory of this script.",
+    )
+    parser.add_argument(
+        "--pyproject",
+        default="pyproject.toml",
+        help="Path to pyproject.toml, relative to repo-root unless absolute.",
+    )
+    parser.add_argument(
+        "--manifest",
+        default="src/manifest.json",
+        help="Path to manifest.json, relative to repo-root unless absolute.",
+    )
+    parser.add_argument(
+        "--docker-image",
+        default=None,
+        help="Override the primary container image repository to pin in the manifest.",
+    )
+    parser.add_argument(
+        "--no-pin-container-image",
+        action="store_true",
+        help="Update versions only and leave manifest container image references unchanged.",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Print the next version without writing files.")
     return parser.parse_args()
 
 
+def resolve_repo_root(value: str | None) -> Path:
+    if value:
+        return Path(value).expanduser().resolve()
+    return Path(__file__).resolve().parents[1]
+
+
+def resolve_path(repo_root: Path, value: str) -> Path:
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = repo_root / path
+    return path.resolve()
+
+
 def load_manifest(path: Path) -> dict:
-    return json.loads(path.read_text())
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def dump_manifest(path: Path, payload: dict) -> None:
-    path.write_text(json.dumps(payload, indent=2) + "\n")
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
 def read_pyproject_version(text: str) -> SemVer:
@@ -197,13 +236,72 @@ def _compare_identifiers(left: tuple[str, ...], right: tuple[str, ...]) -> int:
     return -1 if len(left) < len(right) else 1
 
 
+def image_repository(image: str) -> str:
+    image = image.strip()
+    if "@" in image:
+        image = image.split("@", 1)[0]
+    last_slash = image.rfind("/")
+    last_colon = image.rfind(":")
+    if last_colon > last_slash:
+        return image[:last_colon]
+    return image
+
+
+def infer_primary_container_repo(manifest: dict) -> str | None:
+    top_level_image = manifest.get("image")
+    if isinstance(top_level_image, str) and top_level_image.strip():
+        return image_repository(top_level_image)
+
+    repos: set[str] = set()
+    runtime = manifest.get("runtime")
+    if isinstance(runtime, dict):
+        for platform_config in runtime.values():
+            if not isinstance(platform_config, dict):
+                continue
+            container = platform_config.get("container")
+            if not isinstance(container, dict):
+                continue
+            image = container.get("image")
+            if isinstance(image, str) and image.strip():
+                repos.add(image_repository(image))
+
+    if not repos:
+        return None
+    if len(repos) > 1:
+        raise ValueError("Multiple runtime container image repositories found; pass --docker-image explicitly.")
+    return next(iter(repos))
+
+
+def update_primary_container_images(manifest: dict, *, docker_image: str, version: str) -> None:
+    tagged_image = f"{docker_image}:{version}"
+
+    top_level_image = manifest.get("image")
+    if isinstance(top_level_image, str) and top_level_image.strip():
+        if image_repository(top_level_image) == docker_image:
+            manifest["image"] = tagged_image
+
+    runtime = manifest.get("runtime")
+    if not isinstance(runtime, dict):
+        return
+
+    for platform_config in runtime.values():
+        if not isinstance(platform_config, dict):
+            continue
+        container = platform_config.get("container")
+        if not isinstance(container, dict):
+            continue
+        image = container.get("image")
+        if isinstance(image, str) and image.strip() and image_repository(image) == docker_image:
+            container["image"] = tagged_image
+
+
 def main() -> int:
     args = parse_args()
-    repo_root = Path(__file__).resolve().parents[1]
-    pyproject_path = repo_root / "pyproject.toml"
-    manifest_path = repo_root / "src" / "manifest.json"
+    repo_root = resolve_repo_root(args.repo_root)
+    pyproject_path = resolve_path(repo_root, args.pyproject)
+    manifest_path = resolve_path(repo_root, args.manifest)
 
-    pyproject_text = pyproject_path.read_text()
+    pyproject_text = pyproject_path.read_text(encoding="utf-8")
     pyproject_version = read_pyproject_version(pyproject_text)
     manifest = load_manifest(manifest_path)
     manifest_version = SemVer.parse(str(manifest.get("version") or "").strip())
@@ -226,11 +324,12 @@ def main() -> int:
         return 0
 
     manifest["version"] = target_version
-    runtime = manifest.setdefault("runtime", {}).setdefault("linux", {})
-    container = runtime.setdefault("container", {})
-    container["image"] = f"{args.docker_image}:{target_version}"
+    if not args.no_pin_container_image:
+        docker_image = args.docker_image or infer_primary_container_repo(manifest)
+        if docker_image:
+            update_primary_container_images(manifest, docker_image=docker_image, version=target_version)
 
-    pyproject_path.write_text(write_pyproject_version(pyproject_text, target_version))
+    pyproject_path.write_text(write_pyproject_version(pyproject_text, target_version), encoding="utf-8")
     dump_manifest(manifest_path, manifest)
     print(target_version)
     return 0

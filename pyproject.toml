@@ -28,6 +28,8 @@ package-dir = "src"
 [tool.pdm.scripts]
 matter = "python -m piphi_network_matter"
 matter-controller-bridge = "python -m piphi_network_matter.controller.bridge_cli"
+release-version = "python scripts/release.py"
+release-github = "python scripts/create_github_release.py"
 matter-release-github = "python scripts/create_github_release.py"
 test = "pytest"
 
