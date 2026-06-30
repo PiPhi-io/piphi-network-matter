@@ -9,7 +9,7 @@
     "linux": {
       "type": "container",
       "container": {
-        "image": "piphinetwork/matter-sidecar",
+        "image": "piphinetwork/matter-sidecar:0.1.0",
         "ports": [
           { "container": 8710, "host": 8710 }
         ],
