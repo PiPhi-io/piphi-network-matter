@@ -88,6 +88,9 @@ jobs:
       - name: Run test suite
         run: pdm run pytest
 
+      - name: Validate behavior metadata JSON
+        run: python -m json.tool src/behaviors.json >/dev/null
+
       - name: Reclaim runner disk space before Docker build
         shell: bash
         run: |

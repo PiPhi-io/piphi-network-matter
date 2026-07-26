@@ -1,0 +1,192 @@
+{
+  "behaviorSchemaVersion": "integration.behaviors.v2",
+  "devices": [
+    {
+      "id": "matter_device",
+      "name": "Matter Device",
+      "description": "Matter sensors, lights, plugs, and binary devices exposed through the Matter sidecar.",
+      "deviceClass": "matter_device",
+      "entityType": "device",
+      "capabilities": [
+        "switch_on",
+        "brightness_percent",
+        "temperature_c",
+        "humidity_percent",
+        "battery_percent",
+        "contact_open",
+        "occupancy_detected",
+        "illuminance_raw",
+        "sensor_on",
+        "turn_on",
+        "turn_off",
+        "toggle"
+      ],
+      "intents": [
+        {
+          "id": "automate_matter_device",
+          "label": "Automate a Matter device",
+          "description": "React to Matter state changes and control supported lights and plugs."
+        }
+      ],
+      "triggers": [
+        {
+          "id": "state_changed",
+          "label": "Matter state changes",
+          "description": "Start when Core records changed Matter capabilities.",
+          "capability": "telemetry.state",
+          "runtime": {
+            "event": "device.state_changed",
+            "source": "integration"
+          },
+          "freshness": {
+            "maxAgeSeconds": 180,
+            "staleDataMode": "block"
+          },
+          "ui": {
+            "group": "when"
+          }
+        }
+      ],
+      "conditions": [
+        {
+          "id": "is_on",
+          "label": "Device is on",
+          "type": "boolean",
+          "capability": "switch.power",
+          "capabilityRequirements": ["switch_on"],
+          "operators": ["eq", "neq"],
+          "runtime": {"source": "state", "field": "switch_on", "operator": "eq"},
+          "ui": {"group": "only_if"}
+        },
+        {
+          "id": "brightness_threshold",
+          "label": "Brightness threshold",
+          "type": "number",
+          "capability": "light.brightness",
+          "capabilityRequirements": ["brightness_percent"],
+          "operators": [">", ">=", "<", "<=", "eq"],
+          "runtime": {"source": "state", "field": "brightness_percent", "operator": ">"},
+          "ui": {"group": "only_if"}
+        },
+        {
+          "id": "temperature_threshold",
+          "label": "Temperature threshold",
+          "type": "number",
+          "capability": "sensor.temperature_c",
+          "capabilityRequirements": ["temperature_c"],
+          "operators": [">", ">=", "<", "<=", "eq"],
+          "runtime": {"source": "state", "field": "temperature_c", "operator": ">"},
+          "ui": {"group": "only_if"}
+        },
+        {
+          "id": "humidity_threshold",
+          "label": "Humidity threshold",
+          "type": "number",
+          "capability": "sensor.humidity_percent",
+          "capabilityRequirements": ["humidity_percent"],
+          "operators": [">", ">=", "<", "<=", "eq"],
+          "runtime": {"source": "state", "field": "humidity_percent", "operator": ">"},
+          "ui": {"group": "only_if"}
+        },
+        {
+          "id": "contact_is_open",
+          "label": "Contact is open",
+          "type": "boolean",
+          "capability": "contact.open",
+          "capabilityRequirements": ["contact_open"],
+          "operators": ["eq", "neq"],
+          "runtime": {"source": "state", "field": "contact_open", "operator": "eq"},
+          "ui": {"group": "only_if"}
+        },
+        {
+          "id": "occupancy_detected",
+          "label": "Occupancy is detected",
+          "type": "boolean",
+          "capability": "occupancy.detected",
+          "capabilityRequirements": ["occupancy_detected"],
+          "operators": ["eq", "neq"],
+          "runtime": {"source": "state", "field": "occupancy_detected", "operator": "eq"},
+          "ui": {"group": "only_if"}
+        },
+        {
+          "id": "sensor_is_on",
+          "label": "Binary sensor is on",
+          "type": "boolean",
+          "capability": "sensor.on",
+          "capabilityRequirements": ["sensor_on"],
+          "operators": ["eq", "neq"],
+          "runtime": {"source": "state", "field": "sensor_on", "operator": "eq"},
+          "ui": {"group": "only_if"}
+        }
+      ],
+      "actions": [
+        {
+          "id": "turn_on",
+          "label": "Turn on",
+          "capability": "switch.turn_on",
+          "capabilityRequirements": ["switch_on"],
+          "runtime": {"command": "turn_on"},
+          "failure": {
+            "strategy": "retry_then_stop",
+            "retry": {"maxAttempts": 1, "delaySeconds": 1, "backoff": "fixed"},
+            "timeoutSeconds": 15,
+            "idempotent": true
+          },
+          "safety": {"riskLevel": "medium"},
+          "ui": {"group": "do_this"}
+        },
+        {
+          "id": "turn_off",
+          "label": "Turn off",
+          "capability": "switch.turn_off",
+          "capabilityRequirements": ["switch_on"],
+          "runtime": {"command": "turn_off"},
+          "failure": {
+            "strategy": "retry_then_stop",
+            "retry": {"maxAttempts": 1, "delaySeconds": 1, "backoff": "fixed"},
+            "timeoutSeconds": 15,
+            "idempotent": true
+          },
+          "safety": {"riskLevel": "medium"},
+          "ui": {"group": "do_this"}
+        },
+        {
+          "id": "toggle",
+          "label": "Toggle",
+          "capability": "switch.toggle",
+          "capabilityRequirements": ["switch_on"],
+          "runtime": {"command": "toggle"},
+          "failure": {
+            "strategy": "stop_on_error",
+            "timeoutSeconds": 15,
+            "idempotent": false
+          },
+          "safety": {"riskLevel": "medium"},
+          "ui": {"group": "do_this"}
+        }
+      ],
+      "freshness": {
+        "maxAgeSeconds": 180,
+        "staleDataMode": "block"
+      },
+      "ui": {
+        "icon": "hub",
+        "category": "matter_device"
+      }
+    }
+  ],
+  "templates": [],
+  "telemetry": {
+    "capabilityMappings": [
+      {"nativeMetric": "switch_on", "capability": "switch.power"},
+      {"nativeMetric": "brightness_percent", "capability": "light.brightness"},
+      {"nativeMetric": "temperature_c", "capability": "sensor.temperature_c"},
+      {"nativeMetric": "humidity_percent", "capability": "sensor.humidity_percent"},
+      {"nativeMetric": "battery_percent", "capability": "sensor.battery_percent"},
+      {"nativeMetric": "contact_open", "capability": "contact.open"},
+      {"nativeMetric": "occupancy_detected", "capability": "occupancy.detected"},
+      {"nativeMetric": "illuminance_raw", "capability": "sensor.illuminance"},
+      {"nativeMetric": "sensor_on", "capability": "sensor.on"}
+    ]
+  }
+}
