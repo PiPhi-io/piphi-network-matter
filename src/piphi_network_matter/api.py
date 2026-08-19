@@ -1,10 +1,19 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+import os
+from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
+from piphi_runtime_kit_python import (
+    AutomationActionRequest,
+    AutomationActionResult,
+    AutomationRegistry,
+    SQLiteAutomationIdempotencyStore,
+)
+from piphi_runtime_kit_python.fastapi import dispatch_automation_action_from_fastapi
 import uvicorn
 
 from .service import MatterSidecarService
@@ -110,8 +119,45 @@ class InvokeCommandRequest(BaseModel):
     args: dict[str, Any] = Field(default_factory=dict)
 
 
+MATTER_AUTOMATION_COMMANDS = frozenset(
+    {"refresh", "toggle", "turn_off", "turn_on"}
+)
+
+
 def create_app(service: MatterSidecarService) -> FastAPI:
     service.mark_started()
+    ledger_path = Path(
+        os.getenv(
+            "PIPHI_AUTOMATION_LEDGER_PATH",
+            str(Path(service.config.storage_dir) / "automation-actions.sqlite3"),
+        )
+    )
+    automation_registry = AutomationRegistry(
+        idempotency_store=SQLiteAutomationIdempotencyStore(ledger_path)
+    )
+
+    async def execute_registered_command(
+        action_request: AutomationActionRequest,
+    ) -> AutomationActionResult:
+        extras = action_request.model_extra or {}
+        node_id = str(extras.get("node_id") or action_request.device_id or "")
+        endpoint_id = int(extras.get("endpoint_id") or 0)
+        try:
+            result = await service.invoke_command(
+                node_id=node_id,
+                endpoint_id=endpoint_id,
+                command=action_request.command,
+                args=action_request.args,
+            )
+        except Exception as exc:
+            return AutomationActionResult.failure(
+                str(exc),
+                metadata={"status_code": status.HTTP_400_BAD_REQUEST},
+            )
+        return AutomationActionResult.success(result)
+
+    for command_name in sorted(MATTER_AUTOMATION_COMMANDS):
+        automation_registry.action(command_name)(execute_registered_command)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
@@ -235,16 +281,37 @@ def create_app(service: MatterSidecarService) -> FastAPI:
         return await service.poll_configured_devices()
 
     @app.post("/v1/commands/invoke")
-    async def invoke_command(payload: InvokeCommandRequest) -> dict[str, Any]:
-        try:
-            return await service.invoke_command(
-                node_id=payload.node_id,
-                endpoint_id=payload.endpoint_id,
-                command=payload.command,
-                args=payload.args,
+    async def invoke_command(
+        payload: InvokeCommandRequest,
+        request: Request,
+    ) -> dict[str, Any]:
+        if payload.command not in MATTER_AUTOMATION_COMMANDS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported command: {payload.command}",
             )
-        except Exception as exc:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        result = await dispatch_automation_action_from_fastapi(
+            automation_registry,
+            request,
+            {
+                **payload.model_dump(mode="python"),
+                "config_id": f"{payload.node_id}:{payload.endpoint_id}",
+                "device_id": payload.node_id,
+            },
+        )
+        if not result.ok:
+            raise HTTPException(
+                status_code=int(
+                    result.metadata.get("status_code")
+                    or (
+                        status.HTTP_503_SERVICE_UNAVAILABLE
+                        if result.retryable
+                        else status.HTTP_409_CONFLICT
+                    )
+                ),
+                detail=result.error,
+            )
+        return {**result.result, "replayed": result.replayed}
 
     return app
 

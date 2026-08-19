@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
@@ -202,6 +203,54 @@ def test_api_invoke_command_route(tmp_path) -> None:
     assert payload["ok"] is True
     assert payload["command"] == "refresh"
     assert payload["args"] == {"force": True}
+
+
+def test_api_command_replays_key_without_repeating_matter_effect(tmp_path) -> None:
+    data_file = tmp_path / "sample_devices.json"
+    _write_sample_devices(data_file)
+    service = MatterSidecarService.from_config(
+        MatterSidecarConfig(
+            log_level="INFO",
+            adapter_kind="sample",
+            poll_interval_seconds=30.0,
+            storage_dir=str(tmp_path / "state"),
+            adapter_data_file=str(data_file),
+            api_host="127.0.0.1",
+            api_port=8710,
+        )
+    )
+    client = TestClient(create_app(service))
+    headers = {"X-PiPhi-Idempotency-Key": "matter-action-idempotency-1"}
+    payload = {
+        "node_id": "1234",
+        "endpoint_id": 1,
+        "command": "refresh",
+        "args": {"force": True},
+    }
+
+    with patch.object(
+        MatterSidecarService,
+        "invoke_command",
+        new_callable=AsyncMock,
+        return_value={
+            "ok": True,
+            "command": "refresh",
+            "args": {"force": True},
+        },
+    ) as invoke_command:
+        first = client.post("/v1/commands/invoke", json=payload, headers=headers)
+        replay = client.post("/v1/commands/invoke", json=payload, headers=headers)
+
+    assert first.status_code == 200
+    assert replay.status_code == 200
+    assert first.json()["replayed"] is False
+    assert replay.json()["replayed"] is True
+    invoke_command.assert_awaited_once_with(
+        node_id="1234",
+        endpoint_id=1,
+        command="refresh",
+        args={"force": True},
+    )
 
 
 def test_api_returns_not_found_for_unknown_config(tmp_path) -> None:
