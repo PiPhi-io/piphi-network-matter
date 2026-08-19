@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:6a45d0d1370782610333040a9024bb6a44c9bee0229944f4c5ec338e13779799"
+content_hash = "sha256:e67ab25f9592b263991105404ee820188091602a200adc70569a989f5a3425d4"
 
 [[metadata.targets]]
 requires_python = "==3.12.*"
@@ -56,7 +56,7 @@ name = "certifi"
 version = "2026.2.25"
 requires_python = ">=3.7"
 summary = "Python package for providing Mozilla's CA Bundle."
-groups = ["dev"]
+groups = ["default", "dev"]
 files = [
     {file = "certifi-2026.2.25-py3-none-any.whl", hash = "sha256:027692e4402ad994f1c42e52a4997a9763c646b73e4096e4d5d6db8af1d6f0fa"},
     {file = "certifi-2026.2.25.tar.gz", hash = "sha256:e887ab5cee78ea814d3472169153c2d12cd43b14bd03329a39a9c6e2e80bfba7"},
@@ -122,7 +122,7 @@ name = "httpcore"
 version = "1.0.9"
 requires_python = ">=3.8"
 summary = "A minimal low-level HTTP client."
-groups = ["dev"]
+groups = ["default", "dev"]
 dependencies = [
     "certifi",
     "h11>=0.16",
@@ -137,7 +137,7 @@ name = "httpx"
 version = "0.28.1"
 requires_python = ">=3.8"
 summary = "The next generation HTTP client."
-groups = ["dev"]
+groups = ["default", "dev"]
 dependencies = [
     "anyio",
     "certifi",
@@ -180,6 +180,35 @@ groups = ["dev"]
 files = [
     {file = "packaging-26.1-py3-none-any.whl", hash = "sha256:5d9c0669c6285e491e0ced2eee587eaf67b670d94a19e94e3984a481aba6802f"},
     {file = "packaging-26.1.tar.gz", hash = "sha256:f042152b681c4bfac5cae2742a55e103d27ab2ec0f3d88037136b6bfe7c9c5de"},
+]
+
+[[package]]
+name = "piphi-runtime-kit-python"
+version = "0.7.1"
+requires_python = ">=3.11"
+summary = "PiPhi Network runtime integration helpers"
+groups = ["default"]
+dependencies = [
+    "httpx<1.0,>=0.27",
+    "pydantic<2.14,>=2.8",
+]
+files = [
+    {file = "piphi_runtime_kit_python-0.7.1-py3-none-any.whl", hash = "sha256:6ad08349ef2940d560ca8dec9bfd80ab679341de39a281edeca4857cdd649eeb"},
+]
+
+[[package]]
+name = "piphi-runtime-kit-python"
+version = "0.7.1"
+extras = ["fastapi"]
+requires_python = ">=3.11"
+summary = "PiPhi Network runtime integration helpers"
+groups = ["default"]
+dependencies = [
+    "fastapi<1.0,>=0.115",
+    "piphi-runtime-kit-python==0.7.1",
+]
+files = [
+    {file = "piphi_runtime_kit_python-0.7.1-py3-none-any.whl", hash = "sha256:6ad08349ef2940d560ca8dec9bfd80ab679341de39a281edeca4857cdd649eeb"},
 ]
 
 [[package]]
