@@ -49,6 +49,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 concurrency:
   group: matter-release-${{ github.event.repository.full_name }}
@@ -167,11 +168,19 @@ jobs:
           set -euo pipefail
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+      - name: Exchange Docker Hub OIDC token
+        id: docker_oidc
+        uses: docker/oidc-action@v1
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          connection_id: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4.5.0
+        with:
+          username: piphinetwork
+          password: ${{ steps.docker_oidc.outputs.token }}
+        env:
+          DOCKERHUB_OIDC_CONNECTIONID: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
