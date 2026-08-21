@@ -25,6 +25,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 concurrency:
   group: matter-chip-tool-${{ github.event.repository.full_name }}
@@ -117,10 +118,11 @@ jobs:
           chmod +x dist/chip-tool/chip-tool
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4.5.0
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          username: piphinetwork
+        env:
+          DOCKERHUB_OIDC_CONNECTIONID: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
