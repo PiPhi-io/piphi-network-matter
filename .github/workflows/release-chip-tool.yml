@@ -117,10 +117,17 @@ jobs:
           test -f dist/chip-tool/chip-tool
           chmod +x dist/chip-tool/chip-tool
 
+      - name: Exchange Docker Hub OIDC token
+        id: docker_oidc
+        uses: docker/oidc-action@v1
+        with:
+          connection_id: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
+
       - name: Log in to Docker Hub
         uses: docker/login-action@v4.5.0
         with:
           username: piphinetwork
+          password: ${{ steps.docker_oidc.outputs.token }}
         env:
           DOCKERHUB_OIDC_CONNECTIONID: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
 
