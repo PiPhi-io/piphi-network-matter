@@ -1,45 +1,41 @@
 # syntax=docker/dockerfile:1.7
 
-ARG CHIP_TOOL_IMAGE=piphinetwork/matter-chip-tool:v1.5.0.1
-FROM ${CHIP_TOOL_IMAGE} AS chip-tool-binary
-
-FROM python:3.12-slim
-
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    MATTER_ADAPTER_KIND=command \
-    MATTER_BRIDGE_BACKEND_KIND=chip-tool \
-    MATTER_STORAGE_DIR=/var/lib/piphi/matter \
-    MATTER_BRIDGE_DATA_FILE=/var/lib/piphi/matter/registry_devices.json \
-    MATTER_CONTROLLER_BINARY=/usr/local/bin/chip-tool
-
+FROM node:24-bookworm-slim AS build
 WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY tsconfig.json ./
+COPY src ./src
+RUN npm run build
+
+FROM node:24-bookworm-slim AS runtime
+ENV NODE_ENV=production \
+    MATTER_STORAGE_DIR=/var/lib/piphi/matter \
+    MATTER_API_HOST=127.0.0.1 \
+    MATTER_API_PORT=8710 \
+    MATTER_BACKEND_HOST=127.0.0.1 \
+    MATTER_BACKEND_PORT=5580 \
+    MATTER_MANAGE_BACKEND=true \
+    MATTER_ENABLE_BLE=false
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libavahi-client3 \
     libdbus-1-3 \
-    libevent-2.1-7 \
-    libglib2.0-0 \
-    libreadline8 \
-    libssl3 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --upgrade pip
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+COPY --from=build /app/dist ./dist
+COPY src/manifest.json src/behaviors.json src/capability-catalog.json ./src/
 
-COPY pyproject.toml README.md /app/
-COPY src /app/src
-COPY docker/entrypoint.sh /usr/local/bin/piphi-matter-entrypoint
-
-RUN pip install . && chmod +x /usr/local/bin/piphi-matter-entrypoint
-
-COPY --from=chip-tool-binary /usr/local/bin/chip-tool /usr/local/bin/chip-tool
+RUN mkdir -p /var/lib/piphi/matter && chown -R node:node /var/lib/piphi/matter
+USER node
 
 EXPOSE 8710
+VOLUME ["/var/lib/piphi/matter"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:8710/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD python -c "import json, urllib.request; json.load(urllib.request.urlopen('http://127.0.0.1:8710/health', timeout=3))" || exit 1
-
-ENTRYPOINT ["/usr/local/bin/piphi-matter-entrypoint"]
-CMD ["serve-api"]
+CMD ["node", "dist/index.js"]

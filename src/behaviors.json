@@ -16,7 +16,8 @@
         "contact_open",
         "occupancy_detected",
         "illuminance_raw",
-        "sensor_on",
+        "connected",
+        "refresh",
         "turn_on",
         "turn_off",
         "toggle"
@@ -182,30 +183,36 @@
           "ui": {
             "group": "only_if"
           }
-        },
-        {
-          "id": "sensor_is_on",
-          "label": "Binary sensor is on",
-          "type": "boolean",
-          "capability": "sensor.on",
-          "capabilityRequirements": [
-            "sensor_on"
-          ],
-          "operators": [
-            "eq",
-            "neq"
-          ],
-          "runtime": {
-            "source": "state",
-            "field": "sensor_on",
-            "operator": "eq"
-          },
-          "ui": {
-            "group": "only_if"
-          }
         }
       ],
       "actions": [
+        {
+          "id": "refresh",
+          "label": "Refresh Matter state",
+          "capability": "device.refresh",
+          "capabilityRequirements": [
+            "connected"
+          ],
+          "runtime": {
+            "command": "refresh"
+          },
+          "failure": {
+            "strategy": "retry_then_stop",
+            "retry": {
+              "maxAttempts": 1,
+              "delaySeconds": 1,
+              "backoff": "fixed"
+            },
+            "timeoutSeconds": 15,
+            "idempotent": true
+          },
+          "safety": {
+            "riskLevel": "low"
+          },
+          "ui": {
+            "group": "do_this"
+          }
+        },
         {
           "id": "turn_on",
           "label": "Turn on",
@@ -447,8 +454,8 @@
         "capability": "sensor.illuminance"
       },
       {
-        "nativeMetric": "sensor_on",
-        "capability": "sensor.on"
+        "nativeMetric": "connected",
+        "capability": "sensor.connected"
       }
     ]
   }
