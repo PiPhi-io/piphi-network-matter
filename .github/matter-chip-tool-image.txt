@@ -1,1 +1,0 @@
-piphinetwork/matter-chip-tool:v1.5.0.1
