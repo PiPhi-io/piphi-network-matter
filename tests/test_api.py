@@ -4,6 +4,7 @@ import json
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
+from piphi_runtime_testkit_python import build_runtime_headers
 
 from piphi_network_matter.api import create_app
 from piphi_network_matter.config import MatterSidecarConfig
@@ -86,6 +87,17 @@ def test_api_health_and_discovery_routes(tmp_path) -> None:
     registry = client.get("/v1/registry")
     assert registry.status_code == 200
     assert registry.json()[0]["node_id"] == "1234"
+
+
+def test_runtime_testkit_builds_sidecar_identity_headers() -> None:
+    headers = build_runtime_headers(
+        container_id="matter-sidecar-test",
+        internal_token="test-token",
+    )
+    assert headers == {
+        "X-Container-Id": "matter-sidecar-test",
+        "X-PiPhi-Integration-Token": "test-token",
+    }
 
 
 def test_api_config_and_telemetry_routes(tmp_path) -> None:
