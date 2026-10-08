@@ -4,9 +4,11 @@ import re
 from copy import deepcopy
 from typing import Any
 
-
 DEVICE_TYPE_NAMES: dict[int, str] = {
     21: "contact_sensor",
+    65: "water_freeze_detector",
+    67: "water_leak_detector",
+    118: "smoke_co_alarm",
     256: "onoff_light",
     257: "dimmable_light",
     262: "light_sensor",
@@ -88,6 +90,46 @@ CAPABILITY_CATALOG: dict[str, dict[str, Any]] = {
             "allowed_widgets": ["access-control-card", "status-list"],
             "default_widget": "access-control-card",
             "recommended_widgets": ["access-control-card"],
+        },
+    },
+    "smoke_alarm": {
+        "label": "Smoke Alarm",
+        "kind": "state",
+        "state_type": "boolean",
+        "dashboard": {
+            "allowed_widgets": ["safety-overview-card", "status-list"],
+            "default_widget": "safety-overview-card",
+            "recommended_widgets": ["safety-overview-card"],
+        },
+    },
+    "carbon_monoxide_alarm": {
+        "label": "Carbon Monoxide Alarm",
+        "kind": "state",
+        "state_type": "boolean",
+        "dashboard": {
+            "allowed_widgets": ["safety-overview-card", "status-list"],
+            "default_widget": "safety-overview-card",
+            "recommended_widgets": ["safety-overview-card"],
+        },
+    },
+    "leak_detected": {
+        "label": "Water Leak",
+        "kind": "state",
+        "state_type": "boolean",
+        "dashboard": {
+            "allowed_widgets": ["safety-overview-card", "status-list"],
+            "default_widget": "safety-overview-card",
+            "recommended_widgets": ["safety-overview-card"],
+        },
+    },
+    "freeze_detected": {
+        "label": "Freeze Risk",
+        "kind": "state",
+        "state_type": "boolean",
+        "dashboard": {
+            "allowed_widgets": ["safety-overview-card", "status-list"],
+            "default_widget": "safety-overview-card",
+            "recommended_widgets": ["safety-overview-card"],
         },
     },
     "occupancy_detected": {
@@ -176,6 +218,33 @@ DEVICE_TYPE_PRESENTATION: dict[str, dict[str, Any]] = {
             "allowed_widgets": ["access-control-card", "status-list"],
             "default_widget": "access-control-card",
             "recommended_widgets": ["access-control-card"],
+        },
+    },
+    "smoke_co_alarm": {
+        "device_class": "safety",
+        "entity_type": "binary_sensor",
+        "dashboard": {
+            "allowed_widgets": ["safety-overview-card", "status-list"],
+            "default_widget": "safety-overview-card",
+            "recommended_widgets": ["safety-overview-card"],
+        },
+    },
+    "water_leak_detector": {
+        "device_class": "safety",
+        "entity_type": "binary_sensor",
+        "dashboard": {
+            "allowed_widgets": ["safety-overview-card", "status-list"],
+            "default_widget": "safety-overview-card",
+            "recommended_widgets": ["safety-overview-card"],
+        },
+    },
+    "water_freeze_detector": {
+        "device_class": "safety",
+        "entity_type": "binary_sensor",
+        "dashboard": {
+            "allowed_widgets": ["safety-overview-card", "status-list"],
+            "default_widget": "safety-overview-card",
+            "recommended_widgets": ["safety-overview-card"],
         },
     },
     "occupancy_sensor": {
@@ -271,6 +340,45 @@ DEVICE_PROFILES: dict[str, dict[str, Any]] = {
         "capabilities": ["contact_open"],
         "chip_tool_reads": {
             "contact_open": {
+                "cluster": "booleanstate",
+                "attribute": "state-value",
+                "value_regex": r"(?:StateValue|Data)\s*[:=]\s*(true|false)",
+                "transform": "bool",
+            }
+        },
+    },
+    "smoke_co_alarm": {
+        "capabilities": ["smoke_alarm", "carbon_monoxide_alarm"],
+        "chip_tool_reads": {
+            "smoke_alarm": {
+                "cluster": "smokecoalarm",
+                "attribute": "smoke-state",
+                "value_regex": r"(?:SmokeState|Data)\s*[:=]\s*(\d+)",
+                "transform": "nonzero_bool",
+            },
+            "carbon_monoxide_alarm": {
+                "cluster": "smokecoalarm",
+                "attribute": "co-state",
+                "value_regex": r"(?:COState|Data)\s*[:=]\s*(\d+)",
+                "transform": "nonzero_bool",
+            },
+        },
+    },
+    "water_leak_detector": {
+        "capabilities": ["leak_detected"],
+        "chip_tool_reads": {
+            "leak_detected": {
+                "cluster": "booleanstate",
+                "attribute": "state-value",
+                "value_regex": r"(?:StateValue|Data)\s*[:=]\s*(true|false)",
+                "transform": "bool",
+            }
+        },
+    },
+    "water_freeze_detector": {
+        "capabilities": ["freeze_detected"],
+        "chip_tool_reads": {
+            "freeze_detected": {
                 "cluster": "booleanstate",
                 "attribute": "state-value",
                 "value_regex": r"(?:StateValue|Data)\s*[:=]\s*(true|false)",

@@ -38,6 +38,8 @@ The current repo now has the sidecar shape:
 - Can commission devices with setup codes into the registry flow
 - Can discover commissionable Matter devices through the bridge/backend path
 - Auto-configures commissioned devices into the configured poll set by default
+- Negotiates concise safety capabilities for Matter Smoke/CO Alarm, Water Leak Detector, and Water Freeze Detector device types
+- Publishes machine-readable safety-event coverage for Core's baseline-safe telemetry bridge; routine contact-open state is explicitly excluded
 - Ships a container path that bundles `chip-tool` for live controller-backed operation
 - Tracks simple sidecar health state like last poll time, discovered device count, and last error
 
@@ -45,7 +47,7 @@ The current repo now has the sidecar shape:
 
 - No native Matter Python/controller backend is wired in yet; the real path currently uses `chip-tool`
 - No controller-native inventory of already commissioned devices yet; steady-state discovery still depends on the registry layer
-- No sidecar-to-core contract is wired in yet beyond the local API we now expose
+- No general-purpose sidecar-to-Core push contract yet; Core currently consumes safety telemetry through the local polling API
 - No subscriptions / push updates yet
 - No persistent multi-fabric controller management yet
 
