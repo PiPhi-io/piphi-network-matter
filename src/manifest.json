@@ -3,42 +3,27 @@
   "kind": "platform_service",
   "id": "piphi.service.matter-sidecar",
   "name": "Matter Sidecar",
-  "version": "0.1.0",
+  "version": "0.2.0-alpha.1",
   "platforms": ["linux"],
   "runtime": {
     "linux": {
       "type": "container",
       "container": {
-        "image": "piphinetwork/matter-sidecar:0.1.0",
+        "image": "piphinetwork/matter-sidecar:0.2.0-alpha.1",
         "ports": [
           { "container": 8710, "host": 8710 }
         ],
         "network_mode": "host",
-        "privileged": true,
-        "devices": [
-          { "host": "/dev/bus/usb", "container": "/dev/bus/usb", "permissions": "rwm" }
-        ],
+        "privileged": false,
         "environment": {
           "MATTER_STORAGE_DIR": "/var/lib/piphi/matter",
-          "MATTER_API_HOST": "0.0.0.0",
-          "MATTER_API_PORT": "8710"
+          "MATTER_API_HOST": "127.0.0.1",
+          "MATTER_API_PORT": "8710",
+          "MATTER_MANAGE_BACKEND": "true",
+          "MATTER_ENABLE_BLE": "false"
         }
       }
     }
-  },
-  "security": {
-    "contract_version": "1",
-    "event_mappings": [
-      {"source_event_type": "matter.safety.smoke.detected", "canonical_event_type": "safety_smoke_detected", "status": "implemented", "device_models": ["Matter Smoke CO Alarm (0x0076)"], "required_permissions": ["Matter fabric operational access"], "notes": "Delivered through Core's baseline-safe Matter telemetry poll bridge."},
-      {"source_event_type": "matter.safety.smoke.cleared", "canonical_event_type": "safety_smoke_cleared", "status": "implemented", "device_models": ["Matter Smoke CO Alarm (0x0076)"], "required_permissions": ["Matter fabric operational access"], "notes": "Delivered through Core's baseline-safe Matter telemetry poll bridge."},
-      {"source_event_type": "matter.safety.carbon_monoxide.detected", "canonical_event_type": "safety_carbon_monoxide_detected", "status": "implemented", "device_models": ["Matter Smoke CO Alarm (0x0076)"], "required_permissions": ["Matter fabric operational access"], "notes": "Delivered through Core's baseline-safe Matter telemetry poll bridge."},
-      {"source_event_type": "matter.safety.carbon_monoxide.cleared", "canonical_event_type": "safety_carbon_monoxide_cleared", "status": "implemented", "device_models": ["Matter Smoke CO Alarm (0x0076)"], "required_permissions": ["Matter fabric operational access"], "notes": "Delivered through Core's baseline-safe Matter telemetry poll bridge."},
-      {"source_event_type": "matter.safety.leak.detected", "canonical_event_type": "safety_leak_detected", "status": "implemented", "device_models": ["Matter Water Leak Detector (0x0043)"], "required_permissions": ["Matter fabric operational access"], "notes": "Delivered through Core's baseline-safe Matter telemetry poll bridge."},
-      {"source_event_type": "matter.safety.leak.cleared", "canonical_event_type": "safety_leak_cleared", "status": "implemented", "device_models": ["Matter Water Leak Detector (0x0043)"], "required_permissions": ["Matter fabric operational access"], "notes": "Delivered through Core's baseline-safe Matter telemetry poll bridge."},
-      {"source_event_type": "matter.safety.freeze.detected", "canonical_event_type": "safety_freeze_detected", "status": "implemented", "device_models": ["Matter Water Freeze Detector (0x0041)"], "required_permissions": ["Matter fabric operational access"], "notes": "Delivered through Core's baseline-safe Matter telemetry poll bridge."},
-      {"source_event_type": "matter.safety.freeze.cleared", "canonical_event_type": "safety_freeze_cleared", "status": "implemented", "device_models": ["Matter Water Freeze Detector (0x0041)"], "required_permissions": ["Matter fabric operational access"], "notes": "Delivered through Core's baseline-safe Matter telemetry poll bridge."},
-      {"source_event_type": "matter.contact.opened", "status": "excluded", "device_models": ["Matter Contact Sensor (0x0015)"], "required_permissions": ["Matter fabric operational access"], "notes": "An open contact is routine state and is not proof of forced entry."}
-    ]
   },
   "api": {
     "endpoints": {
@@ -51,7 +36,10 @@
       "commission_code": "/v1/commission/code",
       "configs": "/v1/configs",
       "telemetry_poll": "/v1/telemetry/poll",
-      "command_invoke": "/v1/commands/invoke"
+      "events": "/v1/events",
+      "command_invoke": "/v1/commands/invoke",
+      "wifi_credentials": "/v1/credentials/wifi",
+      "thread_credentials": "/v1/credentials/thread"
     }
   }
 }
