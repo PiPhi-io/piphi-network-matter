@@ -15,13 +15,14 @@
     "@matter-server/ws-client": "1.4.0",
     "fastify": "^5.6.2",
     "matter-server": "1.4.0",
-    "piphi-runtime-kit-node": "^0.4.0"
+    "piphi-runtime-kit-node": "^0.5.1"
   },
   "optionalDependencies": {
     "@matter/nodejs-ble": "0.17.9"
   },
   "devDependencies": {
     "@types/node": "^24.10.0",
+    "piphi-runtime-testkit-node": "^0.1.0",
     "tsx": "^4.20.6",
     "typescript": "^6.0.2"
   },
