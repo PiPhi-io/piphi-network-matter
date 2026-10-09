@@ -4,12 +4,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
+import { assertBehaviorConditionsMatchTelemetry } from "piphi-runtime-testkit-node";
+
 import { createApp } from "../src/app.js";
+import behaviors from "../src/behaviors.json" with { type: "json" };
 import { MatterSidecarService } from "../src/service.js";
 import type { MatterSettings } from "../src/settings.js";
-import { FakeMatterBackend } from "./fake-backend.js";
+import type { MatterNodeSnapshot } from "../src/types.js";
+import { FakeMatterBackend, sampleNode } from "./fake-backend.js";
 
-async function fixture() {
+async function fixture(nodes?: MatterNodeSnapshot[]) {
   const storageDir = await mkdtemp(join(tmpdir(), "piphi-matter-test-"));
   const settings: MatterSettings = {
     apiHost: "127.0.0.1",
@@ -21,14 +25,21 @@ async function fixture() {
     manageBackend: false,
     enableBle: false,
   };
-  const backend = new FakeMatterBackend();
+  const backend = new FakeMatterBackend(nodes);
   const service = new MatterSidecarService(backend, settings);
   const app = createApp(service);
   return { app, backend, service, storageDir };
 }
 
 test("health, discovery, configuration, telemetry, and entities share one negotiated contract", async (t) => {
-  const { app } = await fixture();
+  const contactNode = sampleNode("5678");
+  contactNode.attributes = {
+    "0/40/3": "Contact Sensor",
+    "1/29/0": [{ deviceType: 0x0015, revision: 2 }],
+    "1/29/1": [69],
+    "1/69/0": true,
+  };
+  const { app } = await fixture([sampleNode(), contactNode]);
   t.after(() => app.close());
   assert.equal((await app.inject({ method: "GET", url: "/health" })).statusCode, 200);
   const discovery = await app.inject({ method: "GET", url: "/v1/devices/discover" });
@@ -36,8 +47,18 @@ test("health, discovery, configuration, telemetry, and entities share one negoti
   assert.deepEqual(discovery.json()[0].command_bindings, ["refresh", "toggle", "turn_off", "turn_on"]);
   const configured = await app.inject({ method: "POST", url: "/v1/configs", payload: { node_id: "1234", endpoint_id: 1, alias: "Office" } });
   assert.equal(configured.statusCode, 201);
+  const configuredContact = await app.inject({
+    method: "POST",
+    url: "/v1/configs",
+    payload: { node_id: "5678", endpoint_id: 1, alias: "Door" },
+  });
+  assert.equal(configuredContact.statusCode, 201);
   const telemetry = await app.inject({ method: "POST", url: "/v1/telemetry/poll" });
   assert.equal(telemetry.json()[0].state.temperature_c, 22.45);
+  assertBehaviorConditionsMatchTelemetry(
+    behaviors,
+    telemetry.json().map((sample: { state: Record<string, unknown> }) => sample.state),
+  );
   const entities = await app.inject({ method: "GET", url: "/entities" });
   assert.equal(entities.json().entities[0].name, "Office");
 });
