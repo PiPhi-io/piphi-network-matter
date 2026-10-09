@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 
 export const integrationId = "piphi.service.matter-sidecar";
 export const integrationName = "Matter Sidecar";
-export const integrationVersion = "0.2.0-alpha.1";
+export const integrationVersion = "0.2.0-alpha.2";
 
 export interface MatterSettings {
   apiHost: string;
