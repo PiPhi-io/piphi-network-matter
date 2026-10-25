@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 
 export const integrationId = "piphi.service.matter-sidecar";
 export const integrationName = "Matter Sidecar";
-export const integrationVersion = "0.2.0-alpha.2";
+export const integrationVersion = "0.2.0-alpha.3";
 
 export interface MatterSettings {
   apiHost: string;
@@ -21,6 +21,15 @@ function port(value: string | undefined, fallback: number): number {
   return Number.isInteger(parsed) && parsed > 0 && parsed <= 65535 ? parsed : fallback;
 }
 
+function runtimePort(env: NodeJS.ProcessEnv, fallback: number): number {
+  if (env.PORT === undefined) return port(env.MATTER_API_PORT, fallback);
+  const parsed = Number(env.PORT);
+  if (!/^\d+$/.test(env.PORT) || !Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
+    throw new RangeError("PORT must be an integer between 1 and 65535.");
+  }
+  return parsed;
+}
+
 function enabled(value: string | undefined, fallback = false): boolean {
   if (value === undefined) return fallback;
   return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
@@ -32,7 +41,7 @@ export function loadSettings(env: NodeJS.ProcessEnv = process.env): MatterSettin
   const primaryInterface = env.MATTER_PRIMARY_INTERFACE?.trim() || undefined;
   return {
     apiHost: env.MATTER_API_HOST ?? "127.0.0.1",
-    apiPort: port(env.MATTER_API_PORT, 8710),
+    apiPort: runtimePort(env, 8710),
     backendHost,
     backendPort,
     backendUrl: env.MATTER_BACKEND_URL ?? `ws://${backendHost}:${backendPort}/ws`,

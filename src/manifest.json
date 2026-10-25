@@ -3,7 +3,7 @@
   "kind": "platform_service",
   "id": "piphi.service.matter-sidecar",
   "name": "Matter Sidecar",
-  "version": "0.2.0-alpha.2",
+  "version": "0.2.0-alpha.3",
   "platforms": [
     "linux"
   ],
@@ -11,11 +11,10 @@
     "linux": {
       "type": "container",
       "container": {
-        "image": "piphinetwork/matter-sidecar:0.2.0-alpha.2",
+        "image": "piphinetwork/matter-sidecar:0.2.0-alpha.3",
         "ports": [
           {
-            "container": 8710,
-            "host": 8710
+            "container": 8710
           }
         ],
         "network_mode": "host",
@@ -23,7 +22,6 @@
         "environment": {
           "MATTER_STORAGE_DIR": "/var/lib/piphi/matter",
           "MATTER_API_HOST": "127.0.0.1",
-          "MATTER_API_PORT": "8710",
           "MATTER_MANAGE_BACKEND": "true",
           "MATTER_ENABLE_BLE": "false"
         }
@@ -49,5 +47,10 @@
   },
   "onboarding": {
     "mode": "service"
+  },
+  "runtime_contract": {
+    "version": 1,
+    "port_binding": "core_allocated",
+    "port_env": "PORT"
   }
 }
